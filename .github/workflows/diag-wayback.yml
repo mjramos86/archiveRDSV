@@ -1,0 +1,27 @@
+name: diag-wayback
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe Wayback latency
+        run: |
+          python3 - <<'PY'
+          import csv, time, urllib.request, urllib.error, socket
+          rows=[r for r in csv.DictReader(open('state/index.tsv',encoding='utf-8'),delimiter='\t') if 'html' in r['mimetype']][2000:2025]
+          for i,r in enumerate(rows):
+              u=f"https://web.archive.org/web/{r['timestamp']}id_/{r['original']}"
+              t=time.time()
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0 archive-probe'}),timeout=90) as x:
+                      b=x.read(); print(f"{i:2} {x.status} {len(b):7} B {time.time()-t:5.1f}s", flush=True)
+              except urllib.error.HTTPError as e:
+                  print(f"{i:2} HTTP {e.code} {time.time()-t:5.1f}s retry-after={e.headers.get('Retry-After')}", flush=True)
+              except Exception as e:
+                  print(f"{i:2} {type(e).__name__}: {getattr(e,'reason',e)} {time.time()-t:5.1f}s", flush=True)
+              time.sleep(3)
+          PY
+          curl -sS -o /dev/null -w "curl ipv4: %{http_code} %{time_total}s\n" -4 "https://web.archive.org/web/2023id_/https://jeuxvideo.rds.ca/" || true
+          curl -sS -o /dev/null -w "curl ipv6: %{http_code} %{time_total}s\n" -6 "https://web.archive.org/web/2023id_/https://jeuxvideo.rds.ca/" || true
