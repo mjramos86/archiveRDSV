@@ -39,7 +39,7 @@ jobs:
           git push -q origin HEAD
       - name: Download captures
         id: fetch
-        run: python3 scripts/wayback_dump.py fetch --budget 18900 --commit-every 1000 --workers 3
+        run: python3 scripts/wayback_dump.py fetch --budget 18900 --commit-every 1000 --workers 2
       - name: Continue in a new run if anything is left
         if: ${{ steps.fetch.outputs.remaining != '0' }}
         env:
