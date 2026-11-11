@@ -1,0 +1,47 @@
+name: Wayback Machine dump
+
+# Downloads every URL the Wayback Machine archived for jeuxvideo.rds.ca
+# (latest capture of each) into site/, committing as it goes. A run stops
+# before GitHub's 6-hour limit and re-launches itself until nothing is left.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild_index:
+        description: "Re-query the Wayback index (CDX) before downloading"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: wayback-dump
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+      - name: Build index (first run or on request)
+        if: ${{ inputs.rebuild_index || hashFiles('state/index.tsv') == '' }}
+        run: |
+          python3 scripts/wayback_dump.py index
+          git add state/index.tsv
+          git commit -q -m "Wayback index: $(($(wc -l < state/index.tsv)-1)) URLs" || true
+          git push -q origin HEAD
+      - name: Download captures
+        id: fetch
+        run: python3 scripts/wayback_dump.py fetch --budget 18900 --commit-every 1500 --workers 4
+      - name: Continue in a new run if anything is left
+        if: ${{ steps.fetch.outputs.remaining != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run dump.yml --ref "${GITHUB_REF_NAME}"
