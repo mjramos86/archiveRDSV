@@ -26,22 +26,30 @@ MAX_BYTES = 95 * 1024 * 1024          # GitHub rejects files over 100 MB
 os.makedirs(STATE, exist_ok=True)
 
 
-def get(url, timeout=120, tries=6):
-    delay = 5
+STATS = {}
+
+
+def get(url, timeout=90, tries=4):
+    delay, last = 4, None
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.status, r.read(), dict(r.headers)
         except urllib.error.HTTPError as e:
+            last = e.code
+            STATS[e.code] = STATS.get(e.code, 0) + 1
             if e.code in (404, 403, 410):
                 return e.code, b"", {}
             if e.code == 429 or e.code >= 500:
-                time.sleep(delay); delay = min(delay * 2, 120); continue
+                ra = e.headers.get("Retry-After") if e.headers else None
+                time.sleep(int(ra) if ra and ra.isdigit() else delay); delay = min(delay * 2, 60); continue
             return e.code, b"", {}
-        except Exception:
-            time.sleep(delay); delay = min(delay * 2, 120)
-    return None, b"", {}
+        except Exception as e:  # noqa: BLE001
+            last = type(e).__name__
+            STATS[last] = STATS.get(last, 0) + 1
+            time.sleep(delay); delay = min(delay * 2, 60)
+    return None, b"", {"last": last}
 
 
 def build_index():
@@ -167,6 +175,10 @@ def fetch(budget, commit_every, workers):
         return r, st, body
 
     n = since = 0
+    ok_n, last_commit = [0], [time.time()]
+    for r in todo[:3]:                      # quick probe, visible in the log
+        t0 = time.time(); st, body, h = get(f"https://web.archive.org/web/{r['timestamp']}id_/{r['original']}", tries=1)
+        print(f"probe {st} {len(body)} B in {time.time()-t0:.1f}s {h.get('last', '')} {r['original']}", flush=True)
     with cf.ThreadPoolExecutor(workers) as ex:
         it = iter(todo)
         futs = set()
@@ -194,7 +206,13 @@ def fetch(budget, commit_every, workers):
                     flog.write(f"{r['urlkey']}\t{r['timestamp']}\t{r['original']}\t{st if st != 200 else 'too-large'}\n")
                 # transient failures (None / 5xx after retries) are retried next run
                 n += 1; since += 1
-                if since >= commit_every:
+                if st == 200: ok_n[0] += 1
+                if n % 50 == 0:
+                    el = time.time() - start
+                    print(f"{n} processed ({ok_n[0]} saved) in {el/60:.1f} min, "
+                          f"{n/el*60:.1f}/min, errors {STATS}", flush=True)
+                if since >= commit_every or (since and time.time() - last_commit[0] > 600):
+                    last_commit[0] = time.time()
                     dlog.flush(); flog.flush()
                     git_commit(f"Wayback dump: +{since} files ({n} this run)")
                     since = 0
