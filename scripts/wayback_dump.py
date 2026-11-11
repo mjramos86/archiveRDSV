@@ -165,6 +165,10 @@ def fetch(budget, commit_every, workers):
         rows = drop_redundant_thumbs(list(csv.DictReader(f, delimiter="\t")))
     done, failed = load_set("done.tsv"), load_set("failed.tsv")
     todo = [r for r in rows if r["urlkey"] not in done and r["urlkey"] not in failed]
+    # pages and article data first, then feeds, then images and the rest
+    prio = lambda r: (0 if "html" in r["mimetype"] else 1 if "json" in r["mimetype"]
+                      else 3 if r["mimetype"].startswith("image/") else 2)
+    todo.sort(key=prio)
     print(f"{len(rows)} URLs, {len(done)} done, {len(failed)} failed, {len(todo)} to fetch", flush=True)
     dlog = open(os.path.join(STATE, "done.tsv"), "a", encoding="utf-8")
     flog = open(os.path.join(STATE, "failed.tsv"), "a", encoding="utf-8")
