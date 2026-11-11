@@ -29,7 +29,7 @@ os.makedirs(STATE, exist_ok=True)
 STATS = {}
 import threading
 _RATE_LOCK, _NEXT = threading.Lock(), [0.0]
-INTERVAL = float(os.environ.get("WAYBACK_INTERVAL", "8"))     # stay well under the Wayback limit
+INTERVAL = float(os.environ.get("WAYBACK_INTERVAL", "16"))    # archive.org throttles cloud IPs hard
 
 
 def _pace():
@@ -68,7 +68,7 @@ def get(url, timeout=90, tries=4):
             STATS[last] = STATS.get(last, 0) + 1
             if "/web/" in url:                     # refused connection = soft block
                 with _RATE_LOCK:
-                    _NEXT[0] = max(_NEXT[0], time.time() + 60)
+                    _NEXT[0] = max(_NEXT[0], time.time() + 120)
             time.sleep(delay); delay = min(delay * 2, 60)
     return None, b"", {"last": last}
 
