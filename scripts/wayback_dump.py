@@ -114,10 +114,47 @@ def git_commit(msg):
         time.sleep(5)
 
 
+THUMB_RE = re.compile(r"-\d{2,4}x\d{2,4}(\.(?:jpe?g|png|gif|webp))$", re.I)
+
+
+def drop_redundant_thumbs(rows):
+    """WordPress keeps many resized copies (photo-300x200.jpg…) of each upload.
+    Skip a resized copy when the full-size original is archived too."""
+    originals = {r["original"].split("?")[0].lower() for r in rows}
+    keep, skipped = [], 0
+    for r in rows:
+        url = r["original"].split("?")[0]
+        if r["mimetype"].startswith("image/") and THUMB_RE.search(url) \
+                and THUMB_RE.sub(r"\1", url).lower() in originals:
+            skipped += 1
+            continue
+        keep.append(r)
+    # no original archived: keep only the largest resized copy of each image
+    size_re = re.compile(r"-(\d{2,4})x(\d{2,4})(\.(?:jpe?g|png|gif|webp))$", re.I)
+    best = {}
+    for r in keep:
+        url = r["original"].split("?")[0]
+        m = size_re.search(url)
+        if r["mimetype"].startswith("image/") and m:
+            base, area = size_re.sub(r"\3", url).lower(), int(m.group(1)) * int(m.group(2))
+            if base not in best or area > best[base][0]:
+                best[base] = (area, r["urlkey"])
+    largest = {k for _, k in best.values()}
+    final = []
+    for r in keep:
+        url = r["original"].split("?")[0]
+        if r["mimetype"].startswith("image/") and size_re.search(url) and r["urlkey"] not in largest:
+            skipped += 1
+            continue
+        final.append(r)
+    print(f"skipping {skipped} resized copies (original or a larger copy is archived)", flush=True)
+    return final
+
+
 def fetch(budget, commit_every, workers):
     start = time.time()
     with open(os.path.join(STATE, "index.tsv"), encoding="utf-8") as f:
-        rows = list(csv.DictReader(f, delimiter="\t"))
+        rows = drop_redundant_thumbs(list(csv.DictReader(f, delimiter="\t")))
     done, failed = load_set("done.tsv"), load_set("failed.tsv")
     todo = [r for r in rows if r["urlkey"] not in done and r["urlkey"] not in failed]
     print(f"{len(rows)} URLs, {len(done)} done, {len(failed)} failed, {len(todo)} to fetch", flush=True)
@@ -164,7 +201,8 @@ def fetch(budget, commit_every, workers):
             refill()
     dlog.close(); flog.close()
     git_commit(f"Wayback dump: +{since} files ({n} this run)")
-    remaining = len(rows) - len(load_set("done.tsv")) - len(load_set("failed.tsv"))
+    finished = load_set("done.tsv") | load_set("failed.tsv")
+    remaining = sum(1 for r in rows if r["urlkey"] not in finished)
     print(f"run finished: {n} processed, {remaining} remaining", flush=True)
     with open(os.environ.get("GITHUB_OUTPUT", os.devnull), "a") as o:
         o.write(f"remaining={remaining}\n")

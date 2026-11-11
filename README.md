@@ -10,6 +10,10 @@ site **jeuxvideo.rds.ca** (RDS Jeux vidéo).
 - `state/done.tsv` : adresses récupérées et fichier local correspondant.
 - `state/failed.tsv` : adresses impossibles à récupérer (404, trop volumineuses…).
 
+Les copies redimensionnées des images (photo-300x200.jpg, etc.) ne sont pas
+téléchargées lorsque l'image originale, ou une copie plus grande, est archivée :
+elles sont toutes listées dans `state/index.tsv`.
+
 Le téléchargement tourne dans GitHub Actions (onglet **Actions** →
 *Wayback Machine dump*). Chaque exécution s'arrête avant la limite de six heures
 et en relance une autre jusqu'à ce qu'il ne reste plus rien.
