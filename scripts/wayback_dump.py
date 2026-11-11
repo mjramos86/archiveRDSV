@@ -27,17 +27,35 @@ os.makedirs(STATE, exist_ok=True)
 
 
 STATS = {}
+import threading
+_RATE_LOCK, _NEXT = threading.Lock(), [0.0]
+INTERVAL = float(os.environ.get("WAYBACK_INTERVAL", "4.5"))   # Wayback allows ~15 req/min
+
+
+def _pace():
+    """Space requests out globally so the Wayback Machine never throttles us."""
+    with _RATE_LOCK:
+        now = time.time()
+        wait = _NEXT[0] - now
+        _NEXT[0] = max(now, _NEXT[0]) + INTERVAL
+    if wait > 0:
+        time.sleep(wait)
 
 
 def get(url, timeout=90, tries=4):
     delay, last = 4, None
     for i in range(tries):
         try:
+            if "/web/" in url:
+                _pace()
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.status, r.read(), dict(r.headers)
         except urllib.error.HTTPError as e:
             last = e.code
+            if e.code == 429:                      # back off hard: blocks escalate
+                with _RATE_LOCK:
+                    _NEXT[0] = max(_NEXT[0], time.time() + 90)
             STATS[e.code] = STATS.get(e.code, 0) + 1
             if e.code in (404, 403, 410):
                 return e.code, b"", {}
