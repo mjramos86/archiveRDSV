@@ -236,7 +236,8 @@ def fetch(budget, commit_every, workers):
                 if since >= commit_every or (since and time.time() - last_commit[0] > 600):
                     last_commit[0] = time.time()
                     dlog.flush(); flog.flush()
-                    git_commit(f"Wayback dump: +{since} files ({n} this run)")
+                    el = (time.time() - start) / 60
+                    git_commit(f"Wayback dump: +{since} files ({n} this run, {n/el:.1f}/min, errors {STATS})")
                     since = 0
             refill()
     dlog.close(); flog.close()
