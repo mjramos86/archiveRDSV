@@ -16,9 +16,18 @@ echo   Pour arreter proprement : Ctrl+C (puis O ou Y).
 echo  ==============================================================
 echo.
 
+rem --- Git : celui du systeme, sinon celui fourni avec GitHub Desktop ---
 where git >nul 2>nul
 if errorlevel 1 (
-  echo [!] Git n'est pas installe. Installe-le depuis https://git-scm.com/download/win
+  for /d %%D in ("%LOCALAPPDATA%\GitHubDesktop\app-*") do (
+    if exist "%%D\resources\app\git\cmd\git.exe" set "GITDIR=%%D\resources\app\git\cmd"
+  )
+)
+if defined GITDIR set "PATH=%GITDIR%;%PATH%"
+where git >nul 2>nul
+if errorlevel 1 (
+  echo [!] Git introuvable. Installe GitHub Desktop ^(https://desktop.github.com^)
+  echo     ou Git pour Windows ^(https://git-scm.com/download/win^).
   pause & exit /b 1
 )
 set "PY="

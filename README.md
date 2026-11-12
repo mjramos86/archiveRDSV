@@ -22,20 +22,21 @@ par minute). Depuis une connexion Internet à la maison, ça va beaucoup plus vi
 
 **Une seule fois :**
 
-1. Installe [Git pour Windows](https://git-scm.com/download/win) (options par
-   défaut) et [Python](https://www.python.org/downloads/) (coche
-   *Add python.exe to PATH*).
-2. Ouvre **PowerShell** et copie cette commande :
-
-   ```
-   git clone -c core.longpaths=true https://github.com/mjramos86/archiveRDSV.git "$HOME\archiveRDSV"
-   ```
+1. Installe [Python](https://www.python.org/downloads/) (coche
+   *Add python.exe to PATH* pendant l'installation).
+2. Dans **GitHub Desktop** : *File* → *Clone repository* → onglet *URL*, colle
+   `https://github.com/mjramos86/archiveRDSV` et clique *Clone*.
+   (Sans GitHub Desktop : installe [Git pour Windows](https://git-scm.com/download/win)
+   et clone le dépôt avec `git clone -c core.longpaths=true …`.)
 
 **Ensuite, chaque fois que tu veux faire avancer l'archive :**
 
-- Double-clique sur `ARCHIVER.bat` dans le dossier `archiveRDSV` de ton
-  dossier personnel. La première fois, Windows ouvre une fenêtre de connexion
-  à GitHub : connecte-toi pour autoriser l'envoi des fichiers.
+- Double-clique sur `ARCHIVER.bat` dans le dossier du dépôt (dans GitHub
+  Desktop : *Repository* → *Show in Explorer*). Le script utilise le Git
+  fourni avec GitHub Desktop s'il n'y en a pas d'autre.
+- Si l'envoi vers GitHub échoue (connexion demandée), rien n'est perdu : les
+  fichiers restent enregistrés sur l'ordinateur. Clique simplement
+  *Push origin* dans GitHub Desktop de temps en temps.
 - Tu peux fermer la fenêtre, mettre l'ordinateur en veille ou l'éteindre
   n'importe quand. La prochaine fois, ça reprend là où ça s'est arrêté (au pire,
   les dix dernières minutes sont refaites).
