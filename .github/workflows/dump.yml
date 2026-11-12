@@ -3,8 +3,12 @@ name: Wayback Machine dump
 # Downloads every URL the Wayback Machine archived for jeuxvideo.rds.ca
 # (latest capture of each) into site/, committing as it goes. A run stops
 # before GitHub's 6-hour limit and re-launches itself until nothing is left.
+# When a personal computer runs ARCHIVER.bat, these runs step aside and only
+# resume once the computer has been idle for 2 hours.
 
 on:
+  schedule:
+    - cron: '17 */6 * * *'   # resumes on its own if nothing else is running
   workflow_dispatch:
     inputs:
       rebuild_index:
@@ -39,9 +43,12 @@ jobs:
           git push -q origin HEAD
       - name: Download captures
         id: fetch
-        run: python3 scripts/wayback_dump.py fetch --budget 18900 --commit-every 1000 --workers 1
+        env:
+          DUMP_RUNNER: actions
+        run: python3 scripts/wayback_dump.py fetch --budget 18900 --commit-every 1000 || true
       - name: Continue in a new run if anything is left
-        if: ${{ steps.fetch.outputs.remaining != '0' }}
+        # -1 = a personal computer is doing the work; the 6-hour schedule checks again later
+        if: ${{ steps.fetch.outputs.remaining != '0' && steps.fetch.outputs.remaining != '-1' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run dump.yml --ref "${GITHUB_REF_NAME}"
