@@ -209,12 +209,19 @@ def commit_and_push(msg):
     if git("commit", "-q", "-m", msg).returncode != 0:
         say("! git commit failed (is git configured with your name and email?)")
         return False
+    reason = ""
     for _ in range(4):
-        if git("push", "-q", "origin", "HEAD:main").returncode == 0:
+        r = git("push", "-q", "origin", "HEAD:main")
+        if r.returncode == 0:
             return True
-        git("pull", "-q", "--rebase", "origin", "main")
+        reason = (r.stderr.strip().splitlines() or [""])[-1]
+        if git("pull", "-q", "--rebase", "origin", "main").returncode != 0:
+            git("rebase", "--abort")  # never leave the folder half-rebased
         time.sleep(5)
-    say("! push failed — files are saved and committed on this computer; they will be sent next time")
+    say("! push failed — files are saved and committed on this computer; they will be sent next time"
+        + (f" (git: {reason})" if reason else ""))
+    if RUNNER != "actions":
+        say("  tip: open GitHub Desktop and click « Push origin » to send them now")
     return False
 
 
